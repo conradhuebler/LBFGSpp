@@ -32,9 +32,12 @@ private:
     Vector m_xp;                        // Old x
     Vector m_grad;                      // New gradient
     Scalar m_gnorm;                     // Norm of the gradient
+    Scalar m_step;
     Vector m_gradp;                     // Old gradient
     Vector m_drt;                       // Moving direction
 
+    int m_fpast;  // The length of lag for objective function value to test convergence
+    int m_k = 0;
     // Reset internal variables
     // n: dimension of the vector to be optimized
     inline void reset(int n)
@@ -165,6 +168,101 @@ public:
         return k;
     }
 
+    template <typename Foo>
+    int InitializeSingleSteps(Foo& f, Vector& x, Scalar& fx)
+    {
+        using std::abs;
+
+        // Dimension of the vector
+        const int n = x.size();
+        reset(n);
+
+        // The length of lag for objective function value to test convergence
+        m_fpast = m_param.past;
+
+        // Evaluate function and compute gradient
+        fx = f(x, m_grad);
+        m_gnorm = m_grad.norm();
+        if (m_fpast > 0)
+            m_fx[0] = fx;
+
+        // std::cout << "x0 = " << x.transpose() << std::endl;
+        // std::cout << "f(x0) = " << fx << ", ||grad|| = " << m_gnorm << std::endl << std::endl;
+
+        // Early exit if the initial x is already a minimizer
+        if (m_gnorm <= m_param.epsilon || m_gnorm <= m_param.epsilon_rel * x.norm())
+        {
+            return 1;
+        }
+
+        // Initial direction
+        m_drt.noalias() = -m_grad;
+        // Initial step size
+        m_step = Scalar(1) / m_drt.norm();
+
+        // Number of iterations used
+        m_k = 0;
+        return 0;
+    }
+
+    ///
+    /// Minimizing a multivariate function using the L-BFGS algorithm.
+    /// Exceptions will be thrown if error occurs.
+    ///
+    /// \param f  A function object such that `f(x, grad)` returns the
+    ///           objective function value at `x`, and overwrites `grad` with
+    ///           the gradient.
+    /// \param x  In: An initial guess of the optimal point. Out: The best point
+    ///           found.
+    /// \param fx Out: The objective function value at `x`.
+    ///
+    /// \return Number of iterations used.
+    ///
+    template <typename Foo>
+    inline void SingleStep(Foo& f, Vector& x, Scalar& fx)
+    {
+        using std::abs;
+
+        // std::cout << "Iter " << k << " begins" << std::endl << std::endl;
+
+        // Save the curent x and gradient
+        m_xp.noalias() = x;
+        m_gradp.noalias() = m_grad;
+        Scalar dg = m_grad.dot(m_drt);
+        const Scalar step_max = m_param.max_step;
+
+        // Line search to update x, fx and gradient
+        LineSearch<Scalar>::LineSearch(f, m_param, m_xp, m_drt, step_max, m_step, fx, m_grad, dg, x);
+
+        // New gradient norm
+        m_gnorm = m_grad.norm();
+
+        // std::cout << "Iter " << k << " finished line search" << std::endl;
+        // std::cout << "   x = " << x.transpose() << std::endl;
+        // std::cout << "   f(x) = " << fx << ", ||grad|| = " << m_gnorm << std::endl << std::endl;
+
+        // Convergence test -- gradient
+
+        // Convergence test -- objective function value
+        if (m_fpast > 0)
+        {
+            const Scalar fxd = m_fx[m_k % m_fpast];
+            m_fx[m_k % m_fpast] = fx;
+        }
+
+        // Update s and y
+        // s_{k+1} = x_{k+1} - x_k
+        // y_{k+1} = g_{k+1} - g_k
+        m_bfgs.add_correction(x - m_xp, m_grad - m_gradp);
+
+        // Recursive formula to compute d = -H * g
+        m_bfgs.apply_Hv(m_grad, -Scalar(1), m_drt);
+
+        // Reset step = 1.0 as initial guess for the next line search
+        m_step = Scalar(1);
+        m_k++;
+    }
+
     ///
     /// Returning the gradient vector on the last iterate.
     /// Typically used to debug and test convergence.
@@ -178,6 +276,13 @@ public:
     /// Returning the Euclidean norm of the final gradient.
     ///
     Scalar final_grad_norm() const { return m_gnorm; }
+
+    Scalar Step() const { return m_step; }
+
+    int isConverged()
+    {
+        return m_gnorm <= m_param.epsilon || m_gnorm <= m_param.epsilon_rel * m_xp.norm();
+    }
 };
 
 }  // namespace LBFGSpp
