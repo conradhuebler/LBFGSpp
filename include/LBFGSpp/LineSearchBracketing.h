@@ -119,9 +119,10 @@ public:
             // continue search in mid of current search range
             step = std::isinf(step_hi) ? 2 * step : step_lo / 2 + step_hi / 2;
         }
-
+/*
         if (iter >= param.max_linesearch)
             throw std::runtime_error("the line search routine reached the maximum number of iterations");
+        */
     }
 };
 

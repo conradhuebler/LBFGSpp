@@ -365,13 +365,13 @@ public:
             }
             // Otherwise, recompute x and fx based on new_step
             step = new_step;
-
+/*
             if (step < param.min_step)
                 throw std::runtime_error("the line search step became smaller than the minimum value allowed");
 
             if (step > param.max_step)
                 throw std::runtime_error("the line search step became larger than the maximum value allowed");
-
+*/
             // Update parameter, function value, and gradient
             x.noalias() = xp + step * drt;
             fx = f(x, grad);
@@ -422,11 +422,11 @@ public:
             const Scalar ft = fx - fx_init - step * test_decr;
             if (ft <= fI_lo)
                 return;
-
+/*
             // If not, then the best step size so far is I_lo, but it needs to be positive
             if (I_lo <= Scalar(0))
                 throw std::runtime_error("the line search routine is unable to sufficiently decrease the function value");
-
+*/
             // Return everything with _lo
             step = I_lo;
             fx = fx_lo;

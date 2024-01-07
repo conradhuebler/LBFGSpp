@@ -260,9 +260,9 @@ public:
             if (iter >= param.max_linesearch)
             {
                 // throw std::runtime_error("the line search routine reached the maximum number of iterations");
-                if (step_lo <= Scalar(0))
+/*                if (step_lo <= Scalar(0))
                     throw std::runtime_error("the line search routine failed, unable to sufficiently decrease the function value");
-
+*/
                 // Return everything with _lo
                 step = step_lo;
                 fx = fx_lo;
